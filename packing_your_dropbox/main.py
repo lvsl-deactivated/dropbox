@@ -106,7 +106,7 @@ def bottom_join(box1, box2):
     return result_box
 
 #------------------#
-# OO Classes       #
+#    OO Classes    #
 #------------------#
 class Box(object):
     '''
@@ -132,76 +132,190 @@ class Box(object):
     def area(self):
         return self.width * self.height
 
+    def rotate(self):
+        self._width, self._height = self._height, self._width
+
     def __str__(self):
-        return format_box(draw_box(self.width, self.height))
+        return format_box(draw_box(self._width, self._height))
 
     def __repr__(self):
-        return "<Box %sx%s instance at %s>" % (self.width, self.height, hex(id(self)))
+        return "<Box %sx%s instance at %s>" % (self._width, self._height, hex(id(self)))
 
 
 class Package(object):
     '''
     A package of boxes.
     '''
-    def __init__(self, boxes=None):
-        if not boxes:
-            self._boxes = []
-            return
-        if not all(isinstance(b, Box) for b in boxes):
-            raise TypeError("Boxes must be an iterable with Box instances.")
-        self._boxes = list(boxes)
+    def __init__(self):
+        self._boxes = []
+        self._pack_size = 0
+        self.G = None
 
     def add_box(self, box):
         if not isinstance(box, Box):
             raise TypeError("box must be an instance of Box.")
-        if box in self.boxes:
+        if box in self._boxes:
             raise ValueError("Box %r already in package." % box)
         self._boxes.append(box)
+        self._boxes.sort(key=lambda b: b.area)
+        self.shake_down()
 
     def remove_box(self, box):
         if not isinstance(box, Box):
             raise TypeError("box must be an instance of Box.")
-        if box not in self.boxes:
-            raise ValueError("Box %r not in this packages.")
+        if box not in self._boxes:
+            raise ValueError("Box %r not in this packages." % box)
         self._boxes.remove(box)
+        self.shake_down()
 
     def shake_down(self):
-        pass
+        def rec_width(a, b, t):
+            if isinstance(a, tuple):
+                wa = rec_width(*a)
+            else:
+                wa = a.width
+
+            if isinstance(b, tuple):
+                wb = rec_width(*b)
+            else:
+                wb = b.width
+
+            if t == 'right':
+                return sum([wa, wb])
+            elif t == 'bottom':
+                return max([wa, wb])
+            else:
+                raise ValueError("WTF: %s!?" % t)
+
+        def rec_height(a, b, t):
+            if isinstance(a, tuple):
+                ha = rec_height(*a)
+            else:
+                ha = a.height
+
+            if isinstance(b, tuple):
+                hb = rec_height(*b)
+            else:
+                hb = b.height
+
+            if t == 'right':
+                return max([ha, hb])
+            elif t == 'bottom':
+                return sum([ha, hb])
+            else:
+                raise ValueError("WTF: %s!?" % t)
+
+        if not self._boxes: # empty pack
+            self._pack_size = 0
+        elif len(self._boxes) == 1: # only one box
+            self._pack_size = self._boxes[0].area
+        else:
+            cb = self._boxes[0]
+            t = None
+            for nb in self._boxes[1:]:
+                # TODO: add box rotation
+                if not t:
+                    dw = abs(cb.width - nb.width)
+                    dh = abs(cb.height - nb.height)
+                    rb = Box(nb.width, nb.height)
+                    rb.rotate()
+                    rdw = abs(cb.width - rb.width)
+                    rdh = abs(cb.height - rb.height)
+                    if dw >= dh and dw >= rdw:
+                        t = (nb, cb, 'right')
+                    elif dw >= rdw:
+                        t = (rb, cb, 'right')
+                    elif dh >= rdh:
+                        t = (nb, cb, 'bottom')
+                    else:
+                        t = (rb, cb, 'bottom')
+                else:
+                    w = rec_width(*t)
+                    h = rec_height(*t)
+                    dw = abs(w - nb.width)
+                    dh = abs(h - nb.height)
+                    rb.rotate()
+                    rdw = abs(w - rb.width)
+                    rdh = abs(h - rb.height)
+                    if dw >= dh and dw >= rdw:
+                        t = (t, nb, 'right')
+                    elif dw >= rdw:
+                        t = (t, rb, 'right')
+                    elif dh >= rdh:
+                        t = (t, nb, 'bottom')
+                    else:
+                        t = (t, rb, 'bottom')
+            self.G = t
 
     @property
     def boxes(self):
         return self._boxes[:] # make copy to avoid modifications
 
     @property
-    def area(self):
+    def width(self):
         pass
 
+    @property
+    def height(self):
+        pass
+
+    @property
+    def area(self):
+        return self._pack_size
+
     def __contains__(self, item):
-        return item in self.boxes
+        return item in self._boxes
 
     def __len__(self):
-        return len(self.boxes)
+        return len(self._boxes)
 
     def __str__(self):
-        r = draw_box(self.boxes[0].width, self.boxes[0].height)
-        for i in range(1, len(self)):
-            b = self.boxes[i]
-            # TODO: more clever joining
-            r = right_join(r, draw_box(b.width, b.height))
+        def rec_join(a, b, t):
+            if isinstance(a, tuple):
+                a = rec_join(*a)
+            elif isinstance(a, Box):
+                a = draw_box(a.width, a.height)
+
+            if isinstance(b, tuple):
+                b = rec_join(*b)
+            elif isinstance(b, Box):
+                b = draw_box(b.width, b.height)
+
+            if t == 'right':
+                j = right_join(a, b)
+            elif t == 'bottom':
+                j = bottom_join(a, b)
+            else:
+                raise ValueError("WTF: %w!?" % t)
+
+            return j
+
+        if not self._boxes:
+            return ''
+        elif len(self._boxes) == 1:
+            r = draw_box(self._boxes[0].width, self._boxes[0].height)
+        else:
+            r = rec_join(*self.G)
         return format_box(r)
 
     def __repr__(self):
-        return "<Package instance with %s boxes at %s>" % (len(self.boxes), hex(id(self)))
+        return "<Package instance with %s boxes at %s>" % (len(self._boxes), hex(id(self)))
+
+#------------------------------------------------#
+#    Backtracking algorithm for packing boxes    #
+#------------------------------------------------#
+pass
 
 #------------------#
 #    Main logic    #
 #------------------#
 def main():
     n = int(raw_input())
-    boxes = []
+    p = Package()
     for i in range(n):
         box = [int(x) for x in raw_input().split()]
-        boxes.append(box)
+        p.add_box(Box(*box))
+    print p
 
 if __name__ == "__main__":
     main()
