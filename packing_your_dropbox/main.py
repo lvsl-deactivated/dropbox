@@ -112,6 +112,11 @@ class Box(object):
     '''
     A box
     '''
+
+    SQUARE_SHAPE = 0
+    HORIZONTAL_SHAPE = 1
+    VERTICAL_SHAPE = 2
+
     def __init__(self, width, height):
         if width <= 0 or not isinstance(width, int):
             raise TypeError("width must be a positive integer")
@@ -119,6 +124,15 @@ class Box(object):
             raise TypeError("height must be a positive integer")
         self._width = width
         self._height = height
+
+    @property
+    def shape(self):
+        if self.width > self.height:
+            return self.HORIZONTAL_SHAPE
+        elif self.width < self.height:
+            return self.VERTICAL_SHAPE
+        else:
+            return self.SQUARE_SHAPE
 
     @property
     def width(self):
@@ -301,10 +315,12 @@ class Package(object):
     def __repr__(self):
         return "<Package instance with %s boxes at %s>" % (len(self._boxes), hex(id(self)))
 
+
 #------------------------------------------------#
 #    Backtracking algorithm for packing boxes    #
 #------------------------------------------------#
-pass
+def pack_boxes(boxes):
+    boxes = sorted(boxes, key=lambda b: b[0]*b[1], reverse=True)
 
 #------------------#
 #    Main logic    #
