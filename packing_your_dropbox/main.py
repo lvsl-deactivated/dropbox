@@ -167,7 +167,7 @@ class Shelf(object):
 def main():
     '''
     Note that this problem is NP-hard :-)
-    Here we use gready heuristic approarch, based on shelf algorithm.
+    Here we use gready heuristic approarch, based on the shelf algorithm.
 
     1. Sort boxes by non descreasing min(height, width).
        (we have to use min because we can rotate boxes)
